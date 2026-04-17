@@ -1,0 +1,13 @@
+Updated backend changes:
+- Added Organization entity/module
+- Super Admin can create organizations
+- Super Admin can create admins for an organization
+- Admin-created users inherit the admin's organization
+- Login response now returns type='Bearer' and organization details
+- Fixed security config so admin management endpoints are no longer blocked globally by hasRole(SUPER_ADMIN)
+- User listing is filtered to the admin's own organization
+- Status toggle is restricted to same-organization users for admins
+
+Important frontend/API note:
+- POST /mywallet/management/admins now expects organizationId in the request body.
+- POST /mywallet/management/organizations creates organizations.
