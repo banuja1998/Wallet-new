@@ -6,13 +6,14 @@ import lombok.Data;
 
 @Data
 public class OrganizationRequestDto {
+
     @NotBlank(message = "Organization name is required")
     private String name;
 
-    @NotBlank(message = "Organization email is required")
-    @Email(message = "Invalid organization email")
+    @Email(message = "Invalid email")
     private String email;
 
     private String phone;
+
     private String address;
 }

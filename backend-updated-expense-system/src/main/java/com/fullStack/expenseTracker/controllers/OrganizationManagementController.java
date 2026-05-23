@@ -19,13 +19,41 @@ public class OrganizationManagementController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
-    public ResponseEntity<ApiResponseDto<?>> createOrganization(@RequestBody @Valid OrganizationRequestDto requestDto) {
+    public ResponseEntity<ApiResponseDto<?>> createOrganization(
+            @RequestBody @Valid OrganizationRequestDto requestDto) {
+
         return organizationService.createOrganization(requestDto);
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
     public ResponseEntity<ApiResponseDto<?>> getAllOrganizations() {
+
         return organizationService.getAllOrganizations();
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
+    public ResponseEntity<ApiResponseDto<?>> getOrganizationById(
+            @PathVariable Long id) {
+
+        return organizationService.getOrganizationById(id);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
+    public ResponseEntity<ApiResponseDto<?>> updateOrganization(
+            @PathVariable Long id,
+            @RequestBody @Valid OrganizationRequestDto requestDto) {
+
+        return organizationService.updateOrganization(id, requestDto);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ROLE_SUPER_ADMIN')")
+    public ResponseEntity<ApiResponseDto<?>> deleteOrganization(
+            @PathVariable Long id) {
+
+        return organizationService.deleteOrganization(id);
     }
 }

@@ -10,6 +10,8 @@ import { ThemeContext, useTheme } from "./contexts/ThemeContext.js";
 import NewSavedTransaction from "./pages/user/newSavedTransaction.js";
 import SavedTransactions from "./pages/user/savedTransactions.js";
 import EditSavedTransaction from "./pages/user/editSavedTransaction.js";
+import EditOrganization from "./pages/superadmin/EditOrganization";
+
 
 const Welcome = lazy(() => import("./pages/welcome.js"));
 const Login = lazy(() => import("./pages/auth/login/login.js"));
@@ -93,6 +95,8 @@ function App() {
               <Route path="/superadmin/admins/new" element={<CreateAdmin />} />
               <Route path="/superadmin/settings" element={<SuperAdminProfile />} />
             </Route>
+
+            <Route path="/superadmin/organizations/edit/:id"element={<EditOrganization />}/>
 
             <Route path="/" element={<Welcome />} />
             <Route path="/auth/login" element={<Login />} />

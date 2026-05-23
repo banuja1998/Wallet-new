@@ -22,7 +22,10 @@ const normalizeUser = (payload) => {
 };
 
 const login_req = async (email, password) => {
-  const response = await axios.post(API_BASE_URL + "/auth/signin", { email, password });
+  const response = await axios.post(API_BASE_URL + "/auth/signin", {
+    email,
+    password,
+  });
 
   if (response.data.token) {
     localStorage.setItem("user", JSON.stringify(normalizeUser(response.data)));

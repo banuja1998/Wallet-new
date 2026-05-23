@@ -3,6 +3,8 @@ import { useLocation } from "react-router-dom";
 
 const parseJwt = (token) => {
   try {
+    if (!token) return null;
+
     return JSON.parse(atob(token.split(".")[1]));
   } catch (e) {
     return null;
@@ -10,21 +12,25 @@ const parseJwt = (token) => {
 };
 
 const AuthVerify = (props) => {
-  let location = useLocation();
+  const location = useLocation();
 
   useEffect(() => {
     const user = JSON.parse(localStorage.getItem("user"));
 
-    if (user) {
-      const decodedJwt = parseJwt(user.token);
+    if (!user?.token) return;
 
-      if (decodedJwt.exp * 1000 < Date.now()) {
-        props.logOut();
-      }
+    const decodedJwt = parseJwt(user.token);
+
+    if (!decodedJwt || !decodedJwt.exp) return;
+
+    const isExpired = decodedJwt.exp * 1000 < Date.now();
+
+    if (isExpired) {
+      props.logOut();
     }
   }, [location, props]);
 
-  return <></>;
+  return null;
 };
 
 export default AuthVerify;
