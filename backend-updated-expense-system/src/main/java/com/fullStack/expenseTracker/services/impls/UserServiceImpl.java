@@ -146,29 +146,92 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public ResponseEntity<ApiResponseDto<?>> uploadProfileImg(String email, MultipartFile file)
-            throws UserServiceLogicException, UserNotFoundException {
-        if (existsByEmail(email)) {
-            try {
-                User user = findByEmail(email);
-                String extention = Objects.requireNonNull(file.getOriginalFilename()).substring(file.getOriginalFilename().lastIndexOf("."));
-                String newFileName = user.getUsername().concat(extention);
-                Path targetLocation = Paths.get(userProfileUploadDir).resolve(newFileName);
-                Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-                user.setProfileImgUrl(String.valueOf(targetLocation));
-                userRepository.save(user);
-                return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponseDto<>(
-                        ApiResponseStatus.SUCCESS,
-                        HttpStatus.CREATED,
-                        "Profile image successfully updated!"
-                ));
-            } catch (Exception e) {
-                log.error("Failed to update profile img: {}", e.getMessage());
-                throw new UserServiceLogicException("Failed to update profile image: Try again later!");
-            }
+    public ResponseEntity<ApiResponseDto<?>> uploadProfileImg(
+            String email,
+            MultipartFile file
+    ) throws UserServiceLogicException, UserNotFoundException {
+
+        if (!existsByEmail(email)) {
+            throw new UserNotFoundException(
+                    "User not found with email " + email
+            );
         }
 
-        throw new UserNotFoundException("User not found with email " + email);
+        try {
+
+            if (file == null || file.isEmpty()) {
+                throw new UserServiceLogicException(
+                        "File is empty"
+                );
+            }
+
+            User user = findByEmail(email);
+
+            // Create upload directory if not exists
+            Path uploadPath = Paths.get(userProfileUploadDir);
+
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            // Get extension safely
+            String originalFilename = file.getOriginalFilename();
+
+            String extension = "";
+
+            if (originalFilename != null &&
+                    originalFilename.contains(".")) {
+
+                extension = originalFilename.substring(
+                        originalFilename.lastIndexOf(".")
+                );
+            }
+
+            // Create filename
+            String newFileName =
+                    user.getUsername() + extension;
+
+            // Final file path
+            Path targetLocation =
+                    uploadPath.resolve(newFileName);
+
+            log.info("Uploading file to: {}", targetLocation);
+
+            // Copy file
+            Files.copy(
+                    file.getInputStream(),
+                    targetLocation,
+                    StandardCopyOption.REPLACE_EXISTING
+            );
+
+            // Save path in DB
+            user.setProfileImgUrl(
+                    targetLocation.toString()
+            );
+
+            userRepository.save(user);
+
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(
+                            new ApiResponseDto<>(
+                                    ApiResponseStatus.SUCCESS,
+                                    HttpStatus.CREATED,
+                                    "Profile image successfully updated!"
+                            )
+                    );
+
+        } catch (Exception e) {
+
+            log.error(
+                    "Failed to update profile img",
+                    e
+            );
+
+            throw new UserServiceLogicException(
+                    "Failed to update profile image: "
+                            + e.getMessage()
+            );
+        }
     }
 
     @Override

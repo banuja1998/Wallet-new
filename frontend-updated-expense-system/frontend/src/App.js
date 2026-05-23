@@ -10,7 +10,6 @@ import { ThemeContext, useTheme } from "./contexts/ThemeContext.js";
 import NewSavedTransaction from "./pages/user/newSavedTransaction.js";
 import SavedTransactions from "./pages/user/savedTransactions.js";
 import EditSavedTransaction from "./pages/user/editSavedTransaction.js";
-import EditOrganization from "./pages/superadmin/EditOrganization";
 
 
 const Welcome = lazy(() => import("./pages/welcome.js"));
@@ -41,18 +40,33 @@ const CreateOrganization = lazy(() => import("./pages/superadmin/createOrganizat
 const CreateAdmin = lazy(() => import("./pages/superadmin/createAdmin.js"));
 const ManageAdmins = lazy(() => import("./pages/superadmin/manageAdmins.js"));
 const SuperAdminProfile = lazy(() => import("./pages/superadmin/superAdminProfile.js"));
+const EditOrganization = lazy(() =>import("./pages/superadmin/EditOrganization"));
 
 function App() {
   const [isDarkMode, toggleTheme] = useTheme();
 
-  const ProtectedRoute = ({ isAllowed, redirectPath = "/unauthorized", children }) => {
-    if (!isAllowed) {
-      return <Navigate to={redirectPath} replace />;
-    }
+const ProtectedRoute = ({
+  allowedRoles = [],
+  children,
+}) => {
 
-    return children ? children : <Outlet />;
-  };
+  const user = AuthService.getCurrentUser();
 
+  // NOT LOGGED IN
+  if (!user || !user.token) {
+    return <Navigate to="/auth/login" replace />;
+  }
+
+  // ROLE CHECK
+  if (
+    allowedRoles.length > 0 &&
+    !allowedRoles.some((role) => user.roles.includes(role))
+  ) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  return children ? children : <Outlet />;
+};
   return (
     <Suspense fallback={<LoadingSpinner />}>
       <ThemeContext.Provider value={{ isDarkMode, toggleTheme }}>
