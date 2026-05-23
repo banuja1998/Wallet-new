@@ -4,11 +4,11 @@ import com.fullStack.expenseTracker.dto.reponses.ApiResponseDto;
 import com.fullStack.expenseTracker.dto.reponses.PageResponseDto;
 import com.fullStack.expenseTracker.dto.reponses.UserResponseDto;
 import com.fullStack.expenseTracker.enums.ApiResponseStatus;
+import com.fullStack.expenseTracker.enums.ETransactionType;
 import com.fullStack.expenseTracker.exceptions.RoleNotFoundException;
 import com.fullStack.expenseTracker.exceptions.UserNotFoundException;
 import com.fullStack.expenseTracker.exceptions.UserServiceLogicException;
 import com.fullStack.expenseTracker.factories.RoleFactory;
-import com.fullStack.expenseTracker.enums.ETransactionType;
 import com.fullStack.expenseTracker.models.User;
 import com.fullStack.expenseTracker.repository.TransactionRepository;
 import com.fullStack.expenseTracker.repository.TransactionTypeRepository;
@@ -34,7 +34,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.List;
 
 @Component
 @Slf4j
@@ -44,7 +46,7 @@ public class UserServiceImpl implements UserService {
     private UserRepository userRepository;
 
     @Autowired
-    RoleFactory roleFactory;
+    private RoleFactory roleFactory;
 
     @Autowired
     private TransactionRepository transactionRepository;
@@ -56,92 +58,201 @@ public class UserServiceImpl implements UserService {
     private String userProfileUploadDir;
 
     @Override
-    public ResponseEntity<ApiResponseDto<?>> getAllUsers(int pageNumber, int pageSize, String searchKey)
-            throws RoleNotFoundException, UserServiceLogicException {
-        return getAllUsersByRole(pageNumber, pageSize, searchKey, "user");
+    public ResponseEntity<ApiResponseDto<?>> getAllUsers(
+            int pageNumber,
+            int pageSize,
+            String searchKey
+    ) throws RoleNotFoundException, UserServiceLogicException {
+
+        return getAllUsersByRole(
+                pageNumber,
+                pageSize,
+                searchKey,
+                "user"
+        );
     }
 
     @Override
-    public ResponseEntity<ApiResponseDto<?>> getAllUsersByRole(int pageNumber, int pageSize, String searchKey, String role)
-            throws RoleNotFoundException, UserServiceLogicException {
+    public ResponseEntity<ApiResponseDto<?>> getAllUsersByRole(
+            int pageNumber,
+            int pageSize,
+            String searchKey,
+            String role
+    ) throws RoleNotFoundException, UserServiceLogicException {
 
         Pageable pageable = PageRequest.of(pageNumber, pageSize);
+
         String keyword = searchKey == null ? "" : searchKey;
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        Authentication authentication =
+                SecurityContextHolder.getContext().getAuthentication();
+
         User currentUser = null;
-        if (authentication != null && authentication.isAuthenticated() && authentication.getName() != null
+
+        if (authentication != null
+                && authentication.isAuthenticated()
+                && authentication.getName() != null
                 && !"anonymousUser".equals(authentication.getName())) {
+
             try {
-                currentUser = findByEmail(authentication.getName());
+
+                currentUser = userRepository
+                        .findByUsername(authentication.getName())
+                        .orElse(null);
+
             } catch (Exception ignored) {
             }
         }
 
         Page<User> users;
+
         if (currentUser != null
-                && currentUser.getRoles().stream().anyMatch(r -> r.getName().name().equals("ROLE_ADMIN"))
+                && currentUser.getRoles().stream()
+                .anyMatch(r -> r.getName().name().equals("ROLE_ADMIN"))
                 && currentUser.getOrganization() != null) {
-            users = userRepository.findAllByRoleAndOrganization(pageable, roleFactory.getInstance(role).getId(),
-                    currentUser.getOrganization().getId(), keyword);
+
+            users = userRepository.findAllByRoleAndOrganization(
+                    pageable,
+                    roleFactory.getInstance(role).getId(),
+                    currentUser.getOrganization().getId(),
+                    keyword
+            );
+
         } else {
-            users = userRepository.findAllByRole(pageable, roleFactory.getInstance(role).getId(), keyword);
+
+            users = userRepository.findAllByRole(
+                    pageable,
+                    roleFactory.getInstance(role).getId(),
+                    keyword
+            );
         }
 
         try {
-            List<UserResponseDto> userResponseDtoList = new ArrayList<>();
+
+            List<UserResponseDto> userResponseDtoList =
+                    new ArrayList<>();
 
             for (User u : users) {
-                userResponseDtoList.add(userToUserResponseDto(u));
+
+                userResponseDtoList.add(
+                        userToUserResponseDto(u)
+                );
             }
 
-            return ResponseEntity.status(HttpStatus.OK).body(
-                    new ApiResponseDto<>(
-                            ApiResponseStatus.SUCCESS,
-                            HttpStatus.OK,
-                            new PageResponseDto<>(userResponseDtoList, users.getTotalPages(), users.getTotalElements())
-                    )
-            );
+            return ResponseEntity.status(HttpStatus.OK)
+                    .body(
+                            new ApiResponseDto<>(
+                                    ApiResponseStatus.SUCCESS,
+                                    HttpStatus.OK,
+                                    new PageResponseDto<>(
+                                            userResponseDtoList,
+                                            users.getTotalPages(),
+                                            users.getTotalElements()
+                                    )
+                            )
+                    );
+
         } catch (Exception e) {
-            log.error("Failed to fetch users: {}", e.getMessage());
-            throw new UserServiceLogicException("Failed to fetch users: Try again later!");
+
+            log.error(
+                    "Failed to fetch users: {}",
+                    e.getMessage()
+            );
+
+            throw new UserServiceLogicException(
+                    "Failed to fetch users: Try again later!"
+            );
         }
     }
 
     @Override
-    public User findByUsername(String username) throws UserNotFoundException {
+    public User findByUsername(String username)
+            throws UserNotFoundException {
+
         return userRepository.findByUsername(username)
-                .orElseThrow(() -> new UserNotFoundException("User not found with username: " + username));
+                .orElseThrow(() ->
+                        new UserNotFoundException(
+                                "User not found with username: "
+                                        + username
+                        )
+                );
     }
 
     @Override
-    public ResponseEntity<ApiResponseDto<?>> enableOrDisableUser(long userId)
-            throws UserNotFoundException, UserServiceLogicException {
-        User user = userRepository.findById(userId).orElseThrow(
-                () -> new UserNotFoundException("User not found with id " + userId)
-        );
+    public ResponseEntity<ApiResponseDto<?>> enableOrDisableUser(
+            long userId
+    ) throws UserNotFoundException, UserServiceLogicException {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new UserNotFoundException(
+                                "User not found with id " + userId
+                        )
+                );
 
         try {
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication != null && authentication.isAuthenticated() && authentication.getName() != null) {
-                User currentUser = findByEmail(authentication.getName());
-                boolean isAdmin = currentUser.getRoles().stream().anyMatch(r -> r.getName().name().equals("ROLE_ADMIN"));
-                boolean sameOrganization = currentUser.getOrganization() != null && user.getOrganization() != null
-                        && currentUser.getOrganization().getId().equals(user.getOrganization().getId());
-                if (isAdmin && !sameOrganization) {
-                    throw new UserServiceLogicException("You can only update users in your own organization");
+
+            Authentication authentication =
+                    SecurityContextHolder.getContext().getAuthentication();
+
+            if (authentication != null
+                    && authentication.isAuthenticated()
+                    && authentication.getName() != null) {
+
+                User currentUser = userRepository
+                        .findByUsername(authentication.getName())
+                        .orElse(null);
+
+                if (currentUser != null) {
+
+                    boolean isAdmin = currentUser.getRoles()
+                            .stream()
+                            .anyMatch(r ->
+                                    r.getName().name()
+                                            .equals("ROLE_ADMIN")
+                            );
+
+                    boolean sameOrganization =
+                            currentUser.getOrganization() != null
+                                    && user.getOrganization() != null
+                                    && currentUser.getOrganization()
+                                    .getId()
+                                    .equals(
+                                            user.getOrganization().getId()
+                                    );
+
+                    if (isAdmin && !sameOrganization) {
+
+                        throw new UserServiceLogicException(
+                                "You can only update users in your own organization"
+                        );
+                    }
                 }
             }
+
             user.setEnabled(!user.isEnabled());
+
             userRepository.save(user);
 
-            return ResponseEntity.status(HttpStatus.OK).body(
-                    new ApiResponseDto<>(
-                            ApiResponseStatus.SUCCESS, HttpStatus.OK, "User has been updated successfully!"
-                    )
-            );
+            return ResponseEntity.status(HttpStatus.OK)
+                    .body(
+                            new ApiResponseDto<>(
+                                    ApiResponseStatus.SUCCESS,
+                                    HttpStatus.OK,
+                                    "User has been updated successfully!"
+                            )
+                    );
+
         } catch (Exception e) {
-            log.error("Failed to enable/disable user: {}", e.getMessage());
-            throw new UserServiceLogicException("Failed to update user: Try again later!");
+
+            log.error(
+                    "Failed to enable/disable user: {}",
+                    e.getMessage()
+            );
+
+            throw new UserServiceLogicException(
+                    "Failed to update user: Try again later!"
+            );
         }
     }
 
@@ -152,6 +263,7 @@ public class UserServiceImpl implements UserService {
     ) throws UserServiceLogicException, UserNotFoundException {
 
         if (!existsByEmail(email)) {
+
             throw new UserNotFoundException(
                     "User not found with email " + email
             );
@@ -160,6 +272,7 @@ public class UserServiceImpl implements UserService {
         try {
 
             if (file == null || file.isEmpty()) {
+
                 throw new UserServiceLogicException(
                         "File is empty"
                 );
@@ -167,44 +280,42 @@ public class UserServiceImpl implements UserService {
 
             User user = findByEmail(email);
 
-            // Create upload directory if not exists
             Path uploadPath = Paths.get(userProfileUploadDir);
 
             if (!Files.exists(uploadPath)) {
+
                 Files.createDirectories(uploadPath);
             }
 
-            // Get extension safely
             String originalFilename = file.getOriginalFilename();
 
             String extension = "";
 
-            if (originalFilename != null &&
-                    originalFilename.contains(".")) {
+            if (originalFilename != null
+                    && originalFilename.contains(".")) {
 
                 extension = originalFilename.substring(
                         originalFilename.lastIndexOf(".")
                 );
             }
 
-            // Create filename
             String newFileName =
                     user.getUsername() + extension;
 
-            // Final file path
             Path targetLocation =
                     uploadPath.resolve(newFileName);
 
-            log.info("Uploading file to: {}", targetLocation);
+            log.info(
+                    "Uploading file to: {}",
+                    targetLocation
+            );
 
-            // Copy file
             Files.copy(
                     file.getInputStream(),
                     targetLocation,
                     StandardCopyOption.REPLACE_EXISTING
             );
 
-            // Save path in DB
             user.setProfileImgUrl(
                     targetLocation.toString()
             );
@@ -235,114 +346,198 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public ResponseEntity<ApiResponseDto<?>> getProfileImg(String email) throws UserNotFoundException, IOException, UserServiceLogicException {
+    public ResponseEntity<ApiResponseDto<?>> getProfileImg(
+            String email
+    ) throws UserNotFoundException,
+            IOException,
+            UserServiceLogicException {
+
         if (existsByEmail(email)) {
+
             try {
+
                 User user = findByEmail(email);
 
                 if (user.getProfileImgUrl() != null) {
-                    Path profileImgPath = Paths.get(user.getProfileImgUrl());
-                    byte[] imageBytes = Files.readAllBytes(profileImgPath);
-                    String base64Image = Base64.getEncoder().encodeToString(imageBytes);
 
-                    return ResponseEntity.status(HttpStatus.OK).body(new ApiResponseDto<>(
-                            ApiResponseStatus.SUCCESS,
-                            HttpStatus.OK,
-                            base64Image
-                    ));
-                } else {
-                    return ResponseEntity.status(HttpStatus.OK).body(new ApiResponseDto<>(
-                            ApiResponseStatus.SUCCESS,
-                            HttpStatus.OK,
-                            null
-                    ));
+                    Path profileImgPath =
+                            Paths.get(user.getProfileImgUrl());
+
+                    byte[] imageBytes =
+                            Files.readAllBytes(profileImgPath);
+
+                    String base64Image =
+                            Base64.getEncoder()
+                                    .encodeToString(imageBytes);
+
+                    return ResponseEntity.status(HttpStatus.OK)
+                            .body(
+                                    new ApiResponseDto<>(
+                                            ApiResponseStatus.SUCCESS,
+                                            HttpStatus.OK,
+                                            base64Image
+                                    )
+                            );
                 }
 
+                return ResponseEntity.status(HttpStatus.OK)
+                        .body(
+                                new ApiResponseDto<>(
+                                        ApiResponseStatus.SUCCESS,
+                                        HttpStatus.OK,
+                                        null
+                                )
+                        );
+
             } catch (Exception e) {
-                log.error("Failed to get profile img: {}", e.getMessage());
-                throw new UserServiceLogicException("Failed to get profile image: Try again later!");
+
+                log.error(
+                        "Failed to get profile img: {}",
+                        e.getMessage()
+                );
+
+                throw new UserServiceLogicException(
+                        "Failed to get profile image: Try again later!"
+                );
             }
         }
 
-        throw new UserNotFoundException("User not found with email " + email);
+        throw new UserNotFoundException(
+                "User not found with email " + email
+        );
     }
 
     @Override
-    public ResponseEntity<ApiResponseDto<?>> deleteProfileImg(String email) throws UserServiceLogicException, UserNotFoundException {
+    public ResponseEntity<ApiResponseDto<?>> deleteProfileImg(
+            String email
+    ) throws UserServiceLogicException,
+            UserNotFoundException {
+
         if (existsByEmail(email)) {
+
             try {
+
                 User user = findByEmail(email);
+
                 File file = new File(user.getProfileImgUrl());
+
                 if (file.exists()) {
+
                     if (file.delete()) {
+
                         user.setProfileImgUrl(null);
+
                         userRepository.save(user);
-                        return ResponseEntity.status(HttpStatus.OK).body(new ApiResponseDto<>(
-                                ApiResponseStatus.SUCCESS,
-                                HttpStatus.OK,
-                                "Profile image removed successfully!"
-                        ));
-                    } else {
-                        throw new UserServiceLogicException("Failed to remove profile image: Try again later!");
+
+                        return ResponseEntity.status(HttpStatus.OK)
+                                .body(
+                                        new ApiResponseDto<>(
+                                                ApiResponseStatus.SUCCESS,
+                                                HttpStatus.OK,
+                                                "Profile image removed successfully!"
+                                        )
+                                );
                     }
+
+                    throw new UserServiceLogicException(
+                            "Failed to remove profile image: Try again later!"
+                    );
                 }
-                return ResponseEntity.status(HttpStatus.OK).body(new ApiResponseDto<>(
-                        ApiResponseStatus.SUCCESS,
-                        HttpStatus.OK,
-                        "Profile image removed successfully!"
-                ));
+
+                return ResponseEntity.status(HttpStatus.OK)
+                        .body(
+                                new ApiResponseDto<>(
+                                        ApiResponseStatus.SUCCESS,
+                                        HttpStatus.OK,
+                                        "Profile image removed successfully!"
+                                )
+                        );
+
             } catch (Exception e) {
-                log.error("Failed to delete profile img: {}", e.getMessage());
-                throw new UserServiceLogicException("Failed to remove profile image: Try again later!");
+
+                log.error(
+                        "Failed to delete profile img: {}",
+                        e.getMessage()
+                );
+
+                throw new UserServiceLogicException(
+                        "Failed to remove profile image: Try again later!"
+                );
             }
         }
 
-        throw new UserNotFoundException("User not found with email " + email);
+        throw new UserNotFoundException(
+                "User not found with email " + email
+        );
     }
 
     @Override
     public boolean existsByUsername(String username) {
+
         return userRepository.existsByUsername(username);
     }
 
     @Override
     public boolean existsByEmail(String email) {
+
         return userRepository.existsByEmail(email);
     }
 
     @Override
-    public User findByEmail(String email) throws UserNotFoundException {
+    public User findByEmail(String email)
+            throws UserNotFoundException {
+
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new UserNotFoundException("User not found with email " + email));
+                .orElseThrow(() ->
+                        new UserNotFoundException(
+                                "User not found with email " + email
+                        )
+                );
     }
 
-
-
-
     private UserResponseDto userToUserResponseDto(User user) {
+
         return new UserResponseDto(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
                 user.isEnabled(),
-                user.getOrganization() != null ? user.getOrganization().getId() : null,
-                user.getOrganization() != null ? user.getOrganization().getName() : null,
+
+                user.getOrganization() != null
+                        ? user.getOrganization().getId()
+                        : null,
+
+                user.getOrganization() != null
+                        ? user.getOrganization().getName()
+                        : null,
+
                 transactionRepository.findTotalByUserAndTransactionType(
                         user.getId(),
-                        transactionTypeRepository.findByTransactionTypeName(ETransactionType.TYPE_EXPENSE).getTransactionTypeId(),
+                        transactionTypeRepository
+                                .findByTransactionTypeName(
+                                        ETransactionType.TYPE_EXPENSE
+                                )
+                                .getTransactionTypeId(),
                         LocalDate.now().getMonthValue(),
                         LocalDate.now().getYear()
                 ),
+
                 transactionRepository.findTotalByUserAndTransactionType(
                         user.getId(),
-                        transactionTypeRepository.findByTransactionTypeName(ETransactionType.TYPE_INCOME).getTransactionTypeId(),
+                        transactionTypeRepository
+                                .findByTransactionTypeName(
+                                        ETransactionType.TYPE_INCOME
+                                )
+                                .getTransactionTypeId(),
                         LocalDate.now().getMonthValue(),
                         LocalDate.now().getYear()
                 ),
+
                 transactionRepository.findTotalNoOfTransactionsByUser(
                         user.getId(),
                         LocalDate.now().getMonthValue(),
-                        LocalDate.now().getYear())
+                        LocalDate.now().getYear()
+                )
         );
     }
 }

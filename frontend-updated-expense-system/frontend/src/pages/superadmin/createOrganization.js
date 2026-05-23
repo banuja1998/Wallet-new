@@ -11,30 +11,33 @@ function CreateOrganization() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
-  const onSubmit = async (data) => {
-    setIsLoading(true);
+const onSubmit = async (data) => {
+  setIsLoading(true);
 
-    await SuperAdminService.createOrganization(data.name, data.email, data.phone, data.address).then(
-      (response) => {
-        if (response.data.status === "SUCCESS") {
-          toast.success("Organization created successfully");
-          reset();
-          navigate("/superadmin/organizations", { replace: true });
-          return;
-        }
-        toast.error("Failed to create organization");
-      },
-      (error) => {
-        const message =
-          error?.response?.data?.message ||
-          error?.response?.data?.response ||
-          "Failed to create organization: Try again later!";
-        toast.error(message);
-      },
-    );
+  try {
+    const response = await SuperAdminService.createOrganization({
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      address: data.address,
+    });
 
+    if (response.data.status === "SUCCESS") {
+      toast.success("Organization created successfully");
+      reset();
+      navigate("/superadmin/organizations", { replace: true });
+    } else {
+      toast.error("Failed to create organization");
+    }
+  } catch (error) {
+    const message =
+      error?.response?.data?.message ||
+      "Failed to create organization: Try again later!";
+    toast.error(message);
+  } finally {
     setIsLoading(false);
-  };
+  }
+};
 
   return (
     <Container activeNavId={20}>

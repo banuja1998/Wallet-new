@@ -27,4 +27,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findAllByRoleAndOrganization(Pageable pageable, @Param("roleId") int roleId, @Param("organizationId") Long organizationId, @Param("keyword") String keyword);
 
     Optional<User> findByUsername(String username);
+
+
 }
